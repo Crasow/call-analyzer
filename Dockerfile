@@ -12,8 +12,9 @@ COPY alembic/ ./alembic/
 COPY src/ ./src/
 COPY templates/ ./templates/
 COPY static/ ./static/
+COPY tests/ ./tests/
 
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen
 
 EXPOSE 8080
 

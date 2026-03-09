@@ -6,4 +6,3 @@ __pycache__
 uploads/
 watch/
 .pytest_cache
-tests/
