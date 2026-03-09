@@ -23,6 +23,7 @@ async def generate_content(
     body = {
         "contents": [
             {
+                "role": "user",
                 "parts": [
                     {
                         "inlineData": {
