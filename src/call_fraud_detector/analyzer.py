@@ -81,7 +81,7 @@ async def analyze_file(
         fraud_categories=parsed.get("fraud_categories", []),
         reasons=parsed.get("reasons", []),
         raw_response=raw_response,
-        analyzed_at=datetime.now(UTC),
+        analyzed_at=datetime.now(UTC).replace(tzinfo=None),
     )
     session.add(result)
     await session.commit()
@@ -132,7 +132,7 @@ async def analyze_bytes(
         fraud_categories=parsed.get("fraud_categories", []),
         reasons=parsed.get("reasons", []),
         raw_response=raw_response,
-        analyzed_at=datetime.now(UTC),
+        analyzed_at=datetime.now(UTC).replace(tzinfo=None),
     )
     session.add(result)
     await session.commit()
