@@ -15,3 +15,13 @@ wheels/
 # Uploads and watch
 uploads/
 watch/
+
+# IDE
+.idea/
+.vscode/
+
+# Claude
+.claude/
+
+# pytest
+.pytest_cache/
