@@ -47,6 +47,11 @@ Respond in JSON format:
 
 def _parse_gemini_response(raw: dict) -> dict:
     text = raw["candidates"][0]["content"]["parts"][0]["text"]
+    # Strip markdown code fences if present
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1]  # remove first line (```json)
+        text = text.rsplit("```", 1)[0]  # remove closing ```
     return json.loads(text)
 
 
