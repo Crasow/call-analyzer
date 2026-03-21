@@ -75,6 +75,10 @@ async def upload_file(
     await session.commit()
     await session.refresh(call)
 
+    if pid:
+        call_q = select(Call).options(joinedload(Call.profile)).where(Call.id == call.id)
+        call = (await session.execute(call_q)).unique().scalar_one()
+
     return templates.TemplateResponse("partials/analysis_result.html", {
         "request": request,
         "call": call,

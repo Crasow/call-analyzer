@@ -6,9 +6,13 @@
     </div>
 </div>
 {% elif result %}
-<div class="bg-white rounded-lg shadow p-6 mt-4 border-l-4 {% if result.is_fraud %}border-red-500{% else %}border-green-500{% endif %}">
+<div class="bg-white rounded-lg shadow p-6 mt-4 border-l-4 {% if call.profile %}border-blue-500{% elif result.is_fraud %}border-red-500{% else %}border-green-500{% endif %}">
     <div class="flex items-center gap-3 mb-4">
-        {% if result.is_fraud %}
+        {% if call.profile %}
+        <div class="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100">
+            <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        {% elif result.is_fraud %}
         <div class="flex items-center justify-center w-10 h-10 rounded-full bg-red-100">
             <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
         </div>
@@ -23,14 +27,18 @@
             <span class="text-xs text-gray-500">Profile: {{ call.profile.name }}</span>
             {% endif %}
             <div class="flex items-center gap-2 mt-1">
-                {% if result.is_fraud %}
+                {% if call.profile %}
+                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Done</span>
+                {% elif result.is_fraud %}
                 <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-800">Fraud Detected</span>
                 {% else %}
                 <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">Clean</span>
                 {% endif %}
+                {% if not call.profile %}
                 <span class="text-sm font-bold {% if result.fraud_score > 0.7 %}text-red-600{% elif result.fraud_score > 0.3 %}text-yellow-600{% else %}text-green-600{% endif %}">
                     {{ '%.0f' % (result.fraud_score * 100) }}% fraud score
                 </span>
+                {% endif %}
             </div>
         </div>
         <a href="/calls/{{ call.id }}" class="ml-auto text-blue-600 hover:underline text-sm whitespace-nowrap">View details &rarr;</a>
@@ -39,7 +47,7 @@
     {% if result.fraud_categories %}
     <div class="flex flex-wrap gap-1 mb-3">
         {% for cat in result.fraud_categories %}
-        <span class="px-2 py-1 text-xs bg-red-50 text-red-700 rounded">{{ cat }}</span>
+        <span class="px-2 py-1 text-xs {{ 'bg-red-50 text-red-700' if not call.profile else 'bg-gray-100 text-gray-700' }} rounded">{{ cat }}</span>
         {% endfor %}
     </div>
     {% endif %}
