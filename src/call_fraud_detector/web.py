@@ -1,11 +1,12 @@
 import logging
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request, UploadFile
+from fastapi import APIRouter, Depends, Form, Request, UploadFile
 
 logger = logging.getLogger(__name__)
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +15,7 @@ from sqlalchemy.orm import joinedload
 from call_fraud_detector.audio import SUPPORTED_EXTENSIONS, get_audio_format
 from call_fraud_detector.config import settings
 from call_fraud_detector.database import get_session
-from call_fraud_detector.models import AnalysisResult, Call
+from call_fraud_detector.models import AnalysisResult, Call, Profile
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[2] / "templates"))
@@ -29,15 +30,24 @@ async def index(request: Request, session: AsyncSession = Depends(get_session)):
             select(func.count(AnalysisResult.id)).where(AnalysisResult.is_fraud.is_(True))
         )
     ).scalar() or 0
+
+    profiles = (await session.execute(select(Profile).order_by(Profile.name))).scalars().all()
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "total_calls": total,
         "fraud_calls": fraud,
+        "profiles": profiles,
     })
 
 
 @router.post("/upload", response_class=HTMLResponse)
-async def upload_file(request: Request, file: UploadFile, session: AsyncSession = Depends(get_session)):
+async def upload_file(
+    request: Request,
+    file: UploadFile,
+    profile_id: str | None = Form(None),
+    session: AsyncSession = Depends(get_session),
+):
     ext = Path(file.filename or "").suffix.lower()
     if ext not in SUPPORTED_EXTENSIONS:
         return templates.TemplateResponse("partials/analysis_result.html", {
@@ -50,6 +60,8 @@ async def upload_file(request: Request, file: UploadFile, session: AsyncSession 
     save_path.parent.mkdir(parents=True, exist_ok=True)
     save_path.write_bytes(data)
 
+    pid = uuid.UUID(profile_id) if profile_id else None
+
     call = Call(
         id=uuid.uuid4(),
         filename=file.filename or "unknown",
@@ -57,6 +69,7 @@ async def upload_file(request: Request, file: UploadFile, session: AsyncSession 
         source="upload",
         file_path=str(save_path),
         status="pending",
+        profile_id=pid,
     )
     session.add(call)
     await session.commit()
@@ -70,7 +83,7 @@ async def upload_file(request: Request, file: UploadFile, session: AsyncSession 
 
 @router.get("/calls/{call_id}/status", response_class=HTMLResponse)
 async def call_status(request: Request, call_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
-    query = select(Call).options(joinedload(Call.analysis)).where(Call.id == call_id)
+    query = select(Call).options(joinedload(Call.analysis), joinedload(Call.profile)).where(Call.id == call_id)
     call = (await session.execute(query)).unique().scalar_one_or_none()
     if not call:
         return HTMLResponse("Call not found", status_code=404)
@@ -89,7 +102,11 @@ async def calls_list(
     page: int = 1,
     session: AsyncSession = Depends(get_session),
 ):
-    query = select(Call).options(joinedload(Call.analysis)).order_by(Call.created_at.desc())
+    query = (
+        select(Call)
+        .options(joinedload(Call.analysis), joinedload(Call.profile))
+        .order_by(Call.created_at.desc())
+    )
     size = 20
 
     fraud_filter = None
@@ -123,7 +140,7 @@ async def calls_list(
 
 @router.get("/calls/{call_id}", response_class=HTMLResponse)
 async def call_detail(request: Request, call_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
-    query = select(Call).options(joinedload(Call.analysis)).where(Call.id == call_id)
+    query = select(Call).options(joinedload(Call.analysis), joinedload(Call.profile)).where(Call.id == call_id)
     call = (await session.execute(query)).unique().scalar_one_or_none()
     if not call:
         return HTMLResponse("Call not found", status_code=404)
@@ -132,3 +149,131 @@ async def call_detail(request: Request, call_id: uuid.UUID, session: AsyncSessio
         "call": call,
         "result": call.analysis,
     })
+
+
+# ── Profile CRUD (Web UI) ───────────────────────────────────────────
+
+@router.get("/profiles", response_class=HTMLResponse)
+async def profiles_list(request: Request, session: AsyncSession = Depends(get_session)):
+    profiles = (await session.execute(select(Profile).order_by(Profile.name))).scalars().all()
+    return templates.TemplateResponse("profiles.html", {
+        "request": request,
+        "profiles": profiles,
+    })
+
+
+@router.get("/profiles/new", response_class=HTMLResponse)
+async def profile_new(request: Request):
+    return templates.TemplateResponse("profile_form.html", {
+        "request": request,
+        "profile": None,
+    })
+
+
+@router.post("/profiles", response_class=HTMLResponse)
+async def profile_create(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    prompt_mode: str = Form("custom"),
+    custom_prompt: str = Form(""),
+    expert: str = Form(""),
+    main_task: str = Form(""),
+    fields_for_json: str = Form(""),
+    trigger_words: str = Form(""),
+    session: AsyncSession = Depends(get_session),
+):
+    if prompt_mode not in ("custom", "template"):
+        return templates.TemplateResponse("profile_form.html", {
+            "request": request,
+            "profile": None,
+            "error": "prompt_mode must be 'custom' or 'template'",
+        })
+    if prompt_mode == "template" and (not expert.strip() or not main_task.strip()):
+        return templates.TemplateResponse("profile_form.html", {
+            "request": request,
+            "profile": None,
+            "error": "Template mode requires 'expert' and 'main_task' fields",
+        })
+
+    tw_list = [w.strip() for w in trigger_words.split(",") if w.strip()] if trigger_words.strip() else None
+
+    profile = Profile(
+        id=uuid.uuid4(),
+        name=name.strip(),
+        description=description.strip() or None,
+        prompt_mode=prompt_mode,
+        custom_prompt=custom_prompt.strip() or None,
+        expert=expert.strip() or None,
+        main_task=main_task.strip() or None,
+        fields_for_json=fields_for_json.strip() or None,
+        trigger_words=tw_list,
+    )
+    session.add(profile)
+    await session.commit()
+    return RedirectResponse(url="/profiles", status_code=303)
+
+
+@router.get("/profiles/{profile_id}/edit", response_class=HTMLResponse)
+async def profile_edit(request: Request, profile_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+    profile = (await session.execute(select(Profile).where(Profile.id == profile_id))).scalar_one_or_none()
+    if not profile:
+        return HTMLResponse("Profile not found", status_code=404)
+    return templates.TemplateResponse("profile_form.html", {
+        "request": request,
+        "profile": profile,
+    })
+
+
+@router.post("/profiles/{profile_id}/edit", response_class=HTMLResponse)
+async def profile_update(
+    request: Request,
+    profile_id: uuid.UUID,
+    name: str = Form(...),
+    description: str = Form(""),
+    prompt_mode: str = Form("custom"),
+    custom_prompt: str = Form(""),
+    expert: str = Form(""),
+    main_task: str = Form(""),
+    fields_for_json: str = Form(""),
+    trigger_words: str = Form(""),
+    session: AsyncSession = Depends(get_session),
+):
+    profile = (await session.execute(select(Profile).where(Profile.id == profile_id))).scalar_one_or_none()
+    if not profile:
+        return HTMLResponse("Profile not found", status_code=404)
+
+    if prompt_mode not in ("custom", "template"):
+        return templates.TemplateResponse("profile_form.html", {
+            "request": request,
+            "profile": profile,
+            "error": "prompt_mode must be 'custom' or 'template'",
+        })
+    if prompt_mode == "template" and (not expert.strip() or not main_task.strip()):
+        return templates.TemplateResponse("profile_form.html", {
+            "request": request,
+            "profile": profile,
+            "error": "Template mode requires 'expert' and 'main_task' fields",
+        })
+
+    profile.name = name.strip()
+    profile.description = description.strip() or None
+    profile.prompt_mode = prompt_mode
+    profile.custom_prompt = custom_prompt.strip() or None
+    profile.expert = expert.strip() or None
+    profile.main_task = main_task.strip() or None
+    profile.fields_for_json = fields_for_json.strip() or None
+    profile.trigger_words = [w.strip() for w in trigger_words.split(",") if w.strip()] if trigger_words.strip() else None
+
+    await session.commit()
+    return RedirectResponse(url="/profiles", status_code=303)
+
+
+@router.post("/profiles/{profile_id}/delete")
+async def profile_delete(profile_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+    profile = (await session.execute(select(Profile).where(Profile.id == profile_id))).scalar_one_or_none()
+    if not profile:
+        return HTMLResponse("Profile not found", status_code=404)
+    await session.delete(profile)
+    await session.commit()
+    return RedirectResponse(url="/profiles", status_code=303)
