@@ -15,10 +15,13 @@ from sqlalchemy.orm import joinedload
 from call_fraud_detector.audio import SUPPORTED_EXTENSIONS, get_audio_format
 from call_fraud_detector.config import settings
 from call_fraud_detector.database import get_session
+import json as _json
+
 from call_fraud_detector.models import AnalysisResult, Call, Profile
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[2] / "templates"))
+templates.env.filters["prettyjson"] = lambda v: _json.dumps(v, indent=2, ensure_ascii=False)
 
 
 @router.get("/", response_class=HTMLResponse)
