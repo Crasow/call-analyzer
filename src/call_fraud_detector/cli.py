@@ -32,21 +32,26 @@ def analyze(
     pid = uuid.UUID(profile_id) if profile_id else None
 
     async def _do():
+        import json as _json
         from call_fraud_detector.analyzer import analyze_file
         from call_fraud_detector.database import async_session
 
         async with async_session() as session:
             call, result = await analyze_file(file, "cli", session, profile_id=pid)
-            status = "FRAUD" if result.is_fraud else "CLEAN"
-            typer.echo(f"[{status}] Score: {result.fraud_score:.0%}")
-            if result.fraud_categories:
-                typer.echo(f"Categories: {', '.join(result.fraud_categories)}")
-            if result.reasons:
-                typer.echo("Reasons:")
-                for r in result.reasons:
-                    typer.echo(f"  - {r}")
-            if result.transcript:
-                typer.echo(f"\nTranscript:\n{result.transcript}")
+            if hasattr(result, 'is_fraud'):
+                status = "FRAUD" if result.is_fraud else "CLEAN"
+                typer.echo(f"[{status}] Score: {result.fraud_score:.0%}")
+                if result.fraud_categories:
+                    typer.echo(f"Categories: {', '.join(result.fraud_categories)}")
+                if result.reasons:
+                    typer.echo("Reasons:")
+                    for r in result.reasons:
+                        typer.echo(f"  - {r}")
+                if result.transcript:
+                    typer.echo(f"\nTranscript:\n{result.transcript}")
+            else:
+                typer.echo("[PROFILE] Analysis complete")
+                typer.echo(_json.dumps(result.data, indent=2, ensure_ascii=False))
 
     _run(_do())
 
@@ -77,8 +82,11 @@ def analyze_dir(
             for f in files:
                 try:
                     call, result = await analyze_file(f, "cli", session, profile_id=pid)
-                    status = "FRAUD" if result.is_fraud else "CLEAN"
-                    typer.echo(f"  [{status}] {f.name} — {result.fraud_score:.0%}")
+                    if hasattr(result, 'is_fraud'):
+                        status = "FRAUD" if result.is_fraud else "CLEAN"
+                        typer.echo(f"  [{status}] {f.name} — {result.fraud_score:.0%}")
+                    else:
+                        typer.echo(f"  [PROFILE] {f.name} — done")
                 except Exception as e:
                     typer.echo(f"  [ERROR] {f.name}: {e}")
 
@@ -107,7 +115,7 @@ def list_calls(limit: int = typer.Option(10, help="Number of recent calls")):
         async with async_session() as session:
             query = (
                 select(Call)
-                .options(joinedload(Call.analysis), joinedload(Call.profile))
+                .options(joinedload(Call.analysis), joinedload(Call.profile), joinedload(Call.profile_result))
                 .order_by(Call.created_at.desc())
                 .limit(limit)
             )
@@ -117,7 +125,9 @@ def list_calls(limit: int = typer.Option(10, help="Number of recent calls")):
                 return
             for c in calls:
                 profile_label = f" [{c.profile.name}]" if c.profile else ""
-                if c.analysis:
+                if c.profile_result:
+                    typer.echo(f"[PROFILE] {c.filename}{profile_label} ({c.source}, {c.created_at})")
+                elif c.analysis:
                     status = "FRAUD" if c.analysis.is_fraud else "CLEAN"
                     typer.echo(f"[{status}] {c.filename}{profile_label} — {c.analysis.fraud_score:.0%} ({c.source}, {c.created_at})")
                 else:
@@ -134,7 +144,7 @@ def stats():
         from sqlalchemy import func, select
 
         from call_fraud_detector.database import async_session
-        from call_fraud_detector.models import AnalysisResult, Call
+        from call_fraud_detector.models import AnalysisResult, Call, ProfileResult
 
         async with async_session() as session:
             total = (await session.execute(select(func.count(Call.id)))).scalar() or 0
@@ -143,12 +153,16 @@ def stats():
                     select(func.count(AnalysisResult.id)).where(AnalysisResult.is_fraud.is_(True))
                 )
             ).scalar() or 0
+            profile_count = (
+                await session.execute(select(func.count(ProfileResult.id)))
+            ).scalar() or 0
             avg = (await session.execute(select(func.avg(AnalysisResult.fraud_score)))).scalar()
 
-            typer.echo(f"Total calls:    {total}")
-            typer.echo(f"Fraud detected: {fraud}")
-            typer.echo(f"Clean calls:    {total - fraud}")
-            typer.echo(f"Avg score:      {avg:.1%}" if avg else "Avg score:      N/A")
+            typer.echo(f"Total calls:      {total}")
+            typer.echo(f"Fraud detected:   {fraud}")
+            typer.echo(f"Clean calls:      {total - fraud - profile_count}")
+            typer.echo(f"Profile analyses: {profile_count}")
+            typer.echo(f"Avg fraud score:  {avg:.1%}" if avg else "Avg fraud score:  N/A")
 
     _run(_do())
 

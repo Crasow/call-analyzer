@@ -16,7 +16,7 @@ from call_fraud_detector.audio import (
     get_mime_type,
 )
 from call_fraud_detector.gemini_client import generate_content
-from call_fraud_detector.models import AnalysisResult, Call, Profile
+from call_fraud_detector.models import AnalysisResult, Call, Profile, ProfileResult
 
 ANALYSIS_PROMPT = """\
 You are a phone call fraud detection expert. Analyze this audio recording and provide:
@@ -90,7 +90,7 @@ def _parse_gemini_response(raw: dict) -> dict:
     return json.loads(text)
 
 
-async def analyze_call(call: Call, session: AsyncSession) -> AnalysisResult:
+async def analyze_call(call: Call, session: AsyncSession) -> AnalysisResult | ProfileResult:
     """Analyze an existing Call record (used by the background worker)."""
     if call.file_path:
         audio_b64 = encode_audio_base64(Path(call.file_path))
@@ -102,17 +102,26 @@ async def analyze_call(call: Call, session: AsyncSession) -> AnalysisResult:
     raw_response = await generate_content(audio_b64, mime_type, prompt)
     parsed = _parse_gemini_response(raw_response)
 
-    result = AnalysisResult(
-        id=uuid.uuid4(),
-        call_id=call.id,
-        transcript=parsed.get("transcript"),
-        is_fraud=parsed.get("is_fraud", False),
-        fraud_score=parsed.get("fraud_score", 0.0),
-        fraud_categories=parsed.get("fraud_categories", []),
-        reasons=parsed.get("reasons", []),
-        raw_response=parsed,
-        analyzed_at=datetime.now(UTC).replace(tzinfo=None),
-    )
+    if call.profile is not None:
+        result = ProfileResult(
+            id=uuid.uuid4(),
+            call_id=call.id,
+            data=parsed,
+            transcript=parsed.get("transcript"),
+            analyzed_at=datetime.now(UTC).replace(tzinfo=None),
+        )
+    else:
+        result = AnalysisResult(
+            id=uuid.uuid4(),
+            call_id=call.id,
+            transcript=parsed.get("transcript"),
+            is_fraud=parsed.get("is_fraud", False),
+            fraud_score=parsed.get("fraud_score", 0.0),
+            fraud_categories=parsed.get("fraud_categories", []),
+            reasons=parsed.get("reasons", []),
+            raw_response=parsed,
+            analyzed_at=datetime.now(UTC).replace(tzinfo=None),
+        )
     session.add(result)
     await session.commit()
     await session.refresh(result)
@@ -124,7 +133,7 @@ async def analyze_file(
     source: str,
     session: AsyncSession,
     profile_id: uuid.UUID | None = None,
-) -> tuple[Call, AnalysisResult]:
+) -> tuple[Call, AnalysisResult | ProfileResult]:
     filename = file_path.name
     audio_format = get_audio_format(filename)
     mime_type = get_mime_type(filename)
@@ -149,17 +158,26 @@ async def analyze_file(
     )
     session.add(call)
 
-    result = AnalysisResult(
-        id=uuid.uuid4(),
-        call_id=call.id,
-        transcript=parsed.get("transcript"),
-        is_fraud=parsed.get("is_fraud", False),
-        fraud_score=parsed.get("fraud_score", 0.0),
-        fraud_categories=parsed.get("fraud_categories", []),
-        reasons=parsed.get("reasons", []),
-        raw_response=parsed,
-        analyzed_at=datetime.now(UTC).replace(tzinfo=None),
-    )
+    if profile is not None:
+        result = ProfileResult(
+            id=uuid.uuid4(),
+            call_id=call.id,
+            data=parsed,
+            transcript=parsed.get("transcript"),
+            analyzed_at=datetime.now(UTC).replace(tzinfo=None),
+        )
+    else:
+        result = AnalysisResult(
+            id=uuid.uuid4(),
+            call_id=call.id,
+            transcript=parsed.get("transcript"),
+            is_fraud=parsed.get("is_fraud", False),
+            fraud_score=parsed.get("fraud_score", 0.0),
+            fraud_categories=parsed.get("fraud_categories", []),
+            reasons=parsed.get("reasons", []),
+            raw_response=parsed,
+            analyzed_at=datetime.now(UTC).replace(tzinfo=None),
+        )
     session.add(result)
     await session.commit()
     await session.refresh(call)
@@ -175,7 +193,7 @@ async def analyze_bytes(
     session: AsyncSession,
     save_path: Path | None = None,
     profile_id: uuid.UUID | None = None,
-) -> tuple[Call, AnalysisResult]:
+) -> tuple[Call, AnalysisResult | ProfileResult]:
     if save_path:
         save_path.parent.mkdir(parents=True, exist_ok=True)
         save_path.write_bytes(data)
@@ -208,17 +226,26 @@ async def analyze_bytes(
     )
     session.add(call)
 
-    result = AnalysisResult(
-        id=uuid.uuid4(),
-        call_id=call.id,
-        transcript=parsed.get("transcript"),
-        is_fraud=parsed.get("is_fraud", False),
-        fraud_score=parsed.get("fraud_score", 0.0),
-        fraud_categories=parsed.get("fraud_categories", []),
-        reasons=parsed.get("reasons", []),
-        raw_response=parsed,
-        analyzed_at=datetime.now(UTC).replace(tzinfo=None),
-    )
+    if profile is not None:
+        result = ProfileResult(
+            id=uuid.uuid4(),
+            call_id=call.id,
+            data=parsed,
+            transcript=parsed.get("transcript"),
+            analyzed_at=datetime.now(UTC).replace(tzinfo=None),
+        )
+    else:
+        result = AnalysisResult(
+            id=uuid.uuid4(),
+            call_id=call.id,
+            transcript=parsed.get("transcript"),
+            is_fraud=parsed.get("is_fraud", False),
+            fraud_score=parsed.get("fraud_score", 0.0),
+            fraud_categories=parsed.get("fraud_categories", []),
+            reasons=parsed.get("reasons", []),
+            raw_response=parsed,
+            analyzed_at=datetime.now(UTC).replace(tzinfo=None),
+        )
     session.add(result)
     await session.commit()
     await session.refresh(call)

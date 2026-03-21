@@ -49,6 +49,7 @@ class Call(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
     analysis: Mapped["AnalysisResult | None"] = relationship(back_populates="call", uselist=False, cascade="all, delete-orphan")
+    profile_result: Mapped["ProfileResult | None"] = relationship(back_populates="call", uselist=False, cascade="all, delete-orphan")
     profile: Mapped["Profile | None"] = relationship(back_populates="calls")
 
 
@@ -66,3 +67,15 @@ class AnalysisResult(Base):
     analyzed_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
     call: Mapped[Call] = relationship(back_populates="analysis")
+
+
+class ProfileResult(Base):
+    __tablename__ = "profile_results"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    call_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("calls.id", ondelete="CASCADE"), unique=True, nullable=False)
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
+    analyzed_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
+
+    call: Mapped[Call] = relationship(back_populates="profile_result")

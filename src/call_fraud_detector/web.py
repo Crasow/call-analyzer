@@ -17,7 +17,7 @@ from call_fraud_detector.config import settings
 from call_fraud_detector.database import get_session
 import json as _json
 
-from call_fraud_detector.models import AnalysisResult, Call, Profile
+from call_fraud_detector.models import AnalysisResult, Call, Profile, ProfileResult
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[2] / "templates"))
@@ -25,22 +25,6 @@ templates.env.filters["prettyjson"] = lambda v: _json.dumps(v, indent=2, ensure_
 templates.env.filters["keyname"] = lambda k: k.replace("_", " ").title()
 
 
-def _extract_parsed(raw: dict) -> dict:
-    """Extract parsed model JSON from raw_response, handling both old (full API) and new (parsed) formats."""
-    if "candidates" in raw:
-        try:
-            text = raw["candidates"][0]["content"]["parts"][0]["text"]
-            text = text.strip()
-            if text.startswith("```"):
-                text = text.split("\n", 1)[1]
-                text = text.rsplit("```", 1)[0]
-            return _json.loads(text)
-        except (KeyError, IndexError, _json.JSONDecodeError):
-            return raw
-    return raw
-
-
-templates.env.filters["extract_parsed"] = _extract_parsed
 templates.env.tests["list_value"] = lambda v: isinstance(v, list)
 templates.env.tests["dict_value"] = lambda v: isinstance(v, dict)
 templates.env.tests["bool_value"] = lambda v: isinstance(v, bool)
@@ -56,6 +40,9 @@ async def index(request: Request, session: AsyncSession = Depends(get_session)):
             select(func.count(AnalysisResult.id)).where(AnalysisResult.is_fraud.is_(True))
         )
     ).scalar() or 0
+    profile_calls = (
+        await session.execute(select(func.count(ProfileResult.id)))
+    ).scalar() or 0
 
     profiles = (await session.execute(select(Profile).order_by(Profile.name))).scalars().all()
 
@@ -63,6 +50,7 @@ async def index(request: Request, session: AsyncSession = Depends(get_session)):
         "request": request,
         "total_calls": total,
         "fraud_calls": fraud,
+        "profile_calls": profile_calls,
         "profiles": profiles,
     })
 
@@ -102,7 +90,7 @@ async def upload_file(
     await session.refresh(call)
 
     if pid:
-        call_q = select(Call).options(joinedload(Call.profile)).where(Call.id == call.id)
+        call_q = select(Call).options(joinedload(Call.profile), joinedload(Call.profile_result)).where(Call.id == call.id)
         call = (await session.execute(call_q)).unique().scalar_one()
 
     return templates.TemplateResponse("partials/analysis_result.html", {
@@ -113,14 +101,15 @@ async def upload_file(
 
 @router.get("/calls/{call_id}/status", response_class=HTMLResponse)
 async def call_status(request: Request, call_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
-    query = select(Call).options(joinedload(Call.analysis), joinedload(Call.profile)).where(Call.id == call_id)
+    query = select(Call).options(joinedload(Call.analysis), joinedload(Call.profile), joinedload(Call.profile_result)).where(Call.id == call_id)
     call = (await session.execute(query)).unique().scalar_one_or_none()
     if not call:
         return HTMLResponse("Call not found", status_code=404)
+    result = (call.analysis or call.profile_result) if call.status == "done" else None
     return templates.TemplateResponse("partials/analysis_result.html", {
         "request": request,
         "call": call,
-        "result": call.analysis if call.status == "done" else None,
+        "result": result,
         "error": call.error_message if call.status == "error" else None,
     })
 
@@ -134,7 +123,7 @@ async def calls_list(
 ):
     query = (
         select(Call)
-        .options(joinedload(Call.analysis), joinedload(Call.profile))
+        .options(joinedload(Call.analysis), joinedload(Call.profile), joinedload(Call.profile_result))
         .order_by(Call.created_at.desc())
     )
     size = 20
@@ -170,14 +159,14 @@ async def calls_list(
 
 @router.get("/calls/{call_id}", response_class=HTMLResponse)
 async def call_detail(request: Request, call_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
-    query = select(Call).options(joinedload(Call.analysis), joinedload(Call.profile)).where(Call.id == call_id)
+    query = select(Call).options(joinedload(Call.analysis), joinedload(Call.profile), joinedload(Call.profile_result)).where(Call.id == call_id)
     call = (await session.execute(query)).unique().scalar_one_or_none()
     if not call:
         return HTMLResponse("Call not found", status_code=404)
     return templates.TemplateResponse("call_detail.html", {
         "request": request,
         "call": call,
-        "result": call.analysis,
+        "result": call.analysis or call.profile_result,
     })
 
 

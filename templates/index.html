@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Upload — Call Fraud Detector{% endblock %}
 {% block content %}
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
     <div class="bg-white rounded-lg shadow p-6">
         <div class="text-sm text-gray-500">Total Calls</div>
         <div class="text-3xl font-bold">{{ total_calls }}</div>
@@ -12,7 +12,11 @@
     </div>
     <div class="bg-white rounded-lg shadow p-6">
         <div class="text-sm text-gray-500">Clean Calls</div>
-        <div class="text-3xl font-bold text-green-600">{{ total_calls - fraud_calls }}</div>
+        <div class="text-3xl font-bold text-green-600">{{ total_calls - fraud_calls - profile_calls }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-sm text-gray-500">Profile Analyses</div>
+        <div class="text-3xl font-bold text-blue-600">{{ profile_calls }}</div>
     </div>
 </div>
 

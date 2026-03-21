@@ -27,7 +27,7 @@ async def process_call(call_id, semaphore: asyncio.Semaphore) -> None:
                 )).scalar_one()
                 result = await analyze_call(call, session)
 
-                if result.is_fraud:
+                if hasattr(result, 'is_fraud') and result.is_fraud:
                     try:
                         await send_fraud_alert(call, result)
                     except Exception:

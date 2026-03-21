@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload
 from call_fraud_detector.audio import SUPPORTED_EXTENSIONS, get_audio_format
 from call_fraud_detector.config import settings
 from call_fraud_detector.database import get_session
-from call_fraud_detector.models import AnalysisResult, Call, Profile
+from call_fraud_detector.models import AnalysisResult, Call, Profile, ProfileResult
 
 router = APIRouter(prefix="/api/v1")
 
@@ -37,6 +37,13 @@ def _call_to_dict(call: Call) -> dict:
             "fraud_categories": call.analysis.fraud_categories,
             "reasons": call.analysis.reasons,
             "analyzed_at": call.analysis.analyzed_at.isoformat() if call.analysis.analyzed_at else None,
+        }
+    elif call.profile_result:
+        d["profile_result"] = {
+            "id": str(call.profile_result.id),
+            "data": call.profile_result.data,
+            "transcript": call.profile_result.transcript,
+            "analyzed_at": call.profile_result.analyzed_at.isoformat() if call.profile_result.analyzed_at else None,
         }
     return d
 
@@ -217,7 +224,7 @@ async def list_calls(
 ):
     query = (
         select(Call)
-        .options(joinedload(Call.analysis), joinedload(Call.profile))
+        .options(joinedload(Call.analysis), joinedload(Call.profile), joinedload(Call.profile_result))
         .order_by(Call.created_at.desc())
     )
 
@@ -242,7 +249,7 @@ async def list_calls(
 
 @router.get("/calls/{call_id}")
 async def get_call(call_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
-    query = select(Call).options(joinedload(Call.analysis), joinedload(Call.profile)).where(Call.id == call_id)
+    query = select(Call).options(joinedload(Call.analysis), joinedload(Call.profile), joinedload(Call.profile_result)).where(Call.id == call_id)
     call = (await session.execute(query)).unique().scalar_one_or_none()
     if not call:
         raise HTTPException(404, "Call not found")
@@ -261,10 +268,15 @@ async def get_stats(session: AsyncSession = Depends(get_session)):
         await session.execute(select(func.avg(AnalysisResult.fraud_score)))
     ).scalar()
 
+    profile_count = (
+        await session.execute(select(func.count(ProfileResult.id)))
+    ).scalar() or 0
+
     return {
         "total_calls": total,
         "fraud_calls": fraud_count,
-        "clean_calls": total - fraud_count,
+        "clean_calls": total - fraud_count - profile_count,
+        "profile_calls": profile_count,
         "average_fraud_score": round(avg_score, 3) if avg_score else 0.0,
     }
 

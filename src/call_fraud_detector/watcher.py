@@ -28,8 +28,11 @@ class AudioFileHandler(FileSystemEventHandler):
         async with async_session() as session:
             try:
                 call, result = await analyze_file(path, "watcher", session)
-                status = "FRAUD" if result.is_fraud else "CLEAN"
-                print(f"  [{status}] {path.name} — score: {result.fraud_score:.0%}")
+                if hasattr(result, 'is_fraud'):
+                    status = "FRAUD" if result.is_fraud else "CLEAN"
+                    print(f"  [{status}] {path.name} — score: {result.fraud_score:.0%}")
+                else:
+                    print(f"  [DONE] {path.name} — profile analysis complete")
             except Exception as e:
                 print(f"  [ERROR] {path.name}: {e}")
 
