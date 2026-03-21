@@ -1,11 +1,15 @@
 import asyncio
+import uuid
 from pathlib import Path
+from typing import Optional
 
 import typer
 
 from call_fraud_detector.audio import SUPPORTED_EXTENSIONS
 
 app = typer.Typer(name="cfd", help="Call Fraud Detector CLI")
+profile_app = typer.Typer(name="profile", help="Manage analysis profiles")
+app.add_typer(profile_app)
 
 
 def _run(coro):
@@ -13,7 +17,10 @@ def _run(coro):
 
 
 @app.command()
-def analyze(file: Path = typer.Argument(..., help="Path to audio file")):
+def analyze(
+    file: Path = typer.Argument(..., help="Path to audio file"),
+    profile_id: Optional[str] = typer.Option(None, "--profile-id", help="Profile UUID to use for analysis"),
+):
     """Analyze a single audio file for fraud."""
     if not file.exists():
         typer.echo(f"File not found: {file}")
@@ -22,12 +29,14 @@ def analyze(file: Path = typer.Argument(..., help="Path to audio file")):
         typer.echo(f"Unsupported format: {file.suffix}")
         raise typer.Exit(1)
 
+    pid = uuid.UUID(profile_id) if profile_id else None
+
     async def _do():
         from call_fraud_detector.analyzer import analyze_file
         from call_fraud_detector.database import async_session
 
         async with async_session() as session:
-            call, result = await analyze_file(file, "cli", session)
+            call, result = await analyze_file(file, "cli", session, profile_id=pid)
             status = "FRAUD" if result.is_fraud else "CLEAN"
             typer.echo(f"[{status}] Score: {result.fraud_score:.0%}")
             if result.fraud_categories:
@@ -43,7 +52,10 @@ def analyze(file: Path = typer.Argument(..., help="Path to audio file")):
 
 
 @app.command()
-def analyze_dir(directory: Path = typer.Argument(..., help="Directory with audio files")):
+def analyze_dir(
+    directory: Path = typer.Argument(..., help="Directory with audio files"),
+    profile_id: Optional[str] = typer.Option(None, "--profile-id", help="Profile UUID to use for analysis"),
+):
     """Batch analyze all audio files in a directory."""
     if not directory.is_dir():
         typer.echo(f"Not a directory: {directory}")
@@ -55,6 +67,7 @@ def analyze_dir(directory: Path = typer.Argument(..., help="Directory with audio
         raise typer.Exit(0)
 
     typer.echo(f"Found {len(files)} audio file(s)")
+    pid = uuid.UUID(profile_id) if profile_id else None
 
     async def _do():
         from call_fraud_detector.analyzer import analyze_file
@@ -63,7 +76,7 @@ def analyze_dir(directory: Path = typer.Argument(..., help="Directory with audio
         async with async_session() as session:
             for f in files:
                 try:
-                    call, result = await analyze_file(f, "cli", session)
+                    call, result = await analyze_file(f, "cli", session, profile_id=pid)
                     status = "FRAUD" if result.is_fraud else "CLEAN"
                     typer.echo(f"  [{status}] {f.name} — {result.fraud_score:.0%}")
                 except Exception as e:
@@ -94,7 +107,7 @@ def list_calls(limit: int = typer.Option(10, help="Number of recent calls")):
         async with async_session() as session:
             query = (
                 select(Call)
-                .options(joinedload(Call.analysis))
+                .options(joinedload(Call.analysis), joinedload(Call.profile))
                 .order_by(Call.created_at.desc())
                 .limit(limit)
             )
@@ -103,11 +116,12 @@ def list_calls(limit: int = typer.Option(10, help="Number of recent calls")):
                 typer.echo("No calls found.")
                 return
             for c in calls:
+                profile_label = f" [{c.profile.name}]" if c.profile else ""
                 if c.analysis:
                     status = "FRAUD" if c.analysis.is_fraud else "CLEAN"
-                    typer.echo(f"[{status}] {c.filename} — {c.analysis.fraud_score:.0%} ({c.source}, {c.created_at})")
+                    typer.echo(f"[{status}] {c.filename}{profile_label} — {c.analysis.fraud_score:.0%} ({c.source}, {c.created_at})")
                 else:
-                    typer.echo(f"[PENDING] {c.filename} ({c.source}, {c.created_at})")
+                    typer.echo(f"[PENDING] {c.filename}{profile_label} ({c.source}, {c.created_at})")
 
     _run(_do())
 
@@ -148,6 +162,129 @@ def serve(host: str = "0.0.0.0", port: int = 8080):
 
     application = create_app()
     uvicorn.run(application, host=host, port=port)
+
+
+# ── Profile subcommands ─────────────────────────────────────────────
+
+@profile_app.command("create")
+def profile_create(
+    name: str = typer.Option(..., help="Profile name"),
+    prompt_mode: str = typer.Option("custom", help="Prompt mode: 'custom' or 'template'"),
+    custom_prompt: Optional[str] = typer.Option(None, help="Custom prompt text"),
+    expert: Optional[str] = typer.Option(None, help="Expert role (template mode)"),
+    main_task: Optional[str] = typer.Option(None, help="Main task (template mode)"),
+    fields_for_json: Optional[str] = typer.Option(None, help="JSON fields (template mode)"),
+    trigger_words: Optional[str] = typer.Option(None, help="Comma-separated trigger words"),
+    description: Optional[str] = typer.Option(None, help="Profile description"),
+):
+    """Create a new analysis profile."""
+    if prompt_mode not in ("custom", "template"):
+        typer.echo("Error: prompt_mode must be 'custom' or 'template'")
+        raise typer.Exit(1)
+    if prompt_mode == "template" and (not expert or not main_task):
+        typer.echo("Error: template mode requires --expert and --main-task")
+        raise typer.Exit(1)
+
+    async def _do():
+        from call_fraud_detector.database import async_session
+        from call_fraud_detector.models import Profile
+
+        tw_list = [w.strip() for w in trigger_words.split(",") if w.strip()] if trigger_words else None
+
+        async with async_session() as session:
+            profile = Profile(
+                id=uuid.uuid4(),
+                name=name,
+                description=description,
+                prompt_mode=prompt_mode,
+                custom_prompt=custom_prompt,
+                expert=expert,
+                main_task=main_task,
+                fields_for_json=fields_for_json,
+                trigger_words=tw_list,
+            )
+            session.add(profile)
+            await session.commit()
+            await session.refresh(profile)
+            typer.echo(f"Created profile: {profile.name} (id={profile.id})")
+
+    _run(_do())
+
+
+@profile_app.command("list")
+def profile_list():
+    """List all analysis profiles."""
+
+    async def _do():
+        from sqlalchemy import select
+
+        from call_fraud_detector.database import async_session
+        from call_fraud_detector.models import Profile
+
+        async with async_session() as session:
+            profiles = (await session.execute(select(Profile).order_by(Profile.name))).scalars().all()
+            if not profiles:
+                typer.echo("No profiles found.")
+                return
+            for p in profiles:
+                tw = f" [words: {', '.join(p.trigger_words)}]" if p.trigger_words else ""
+                typer.echo(f"  {p.id}  {p.name} ({p.prompt_mode}){tw}")
+
+    _run(_do())
+
+
+@profile_app.command("update")
+def profile_update(
+    profile_id: str = typer.Argument(..., help="Profile UUID"),
+    name: Optional[str] = typer.Option(None, help="New name"),
+    custom_prompt: Optional[str] = typer.Option(None, help="New custom prompt"),
+    expert: Optional[str] = typer.Option(None, help="New expert role"),
+    main_task: Optional[str] = typer.Option(None, help="New main task"),
+    fields_for_json: Optional[str] = typer.Option(None, help="New JSON fields"),
+    trigger_words: Optional[str] = typer.Option(None, help="New trigger words (comma-separated)"),
+    description: Optional[str] = typer.Option(None, help="New description"),
+    prompt_mode: Optional[str] = typer.Option(None, help="New prompt mode"),
+):
+    """Update an existing analysis profile."""
+
+    async def _do():
+        from sqlalchemy import select
+
+        from call_fraud_detector.database import async_session
+        from call_fraud_detector.models import Profile
+
+        pid = uuid.UUID(profile_id)
+        async with async_session() as session:
+            profile = (await session.execute(select(Profile).where(Profile.id == pid))).scalar_one_or_none()
+            if not profile:
+                typer.echo("Profile not found.")
+                raise typer.Exit(1)
+
+            if name is not None:
+                profile.name = name
+            if description is not None:
+                profile.description = description or None
+            if prompt_mode is not None:
+                if prompt_mode not in ("custom", "template"):
+                    typer.echo("Error: prompt_mode must be 'custom' or 'template'")
+                    raise typer.Exit(1)
+                profile.prompt_mode = prompt_mode
+            if custom_prompt is not None:
+                profile.custom_prompt = custom_prompt or None
+            if expert is not None:
+                profile.expert = expert or None
+            if main_task is not None:
+                profile.main_task = main_task or None
+            if fields_for_json is not None:
+                profile.fields_for_json = fields_for_json or None
+            if trigger_words is not None:
+                profile.trigger_words = [w.strip() for w in trigger_words.split(",") if w.strip()] if trigger_words else None
+
+            await session.commit()
+            await session.refresh(profile)
+            typer.echo(f"Updated profile: {profile.name} (id={profile.id})")
+
+    _run(_do())
 
 
 if __name__ == "__main__":

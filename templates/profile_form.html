@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if profile else 'New' }} Profile — Call Fraud Detector{% endblock %}
+{% block content %}
+<div class="mb-4">
+    <a href="/profiles" class="text-blue-600 hover:underline">&larr; Back to profiles</a>
+</div>
+
+<div class="bg-white rounded-lg shadow p-6 max-w-2xl">
+    <h1 class="text-2xl font-bold mb-6">{{ 'Edit Profile' if profile else 'New Profile' }}</h1>
+
+    {% if error %}
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+        <span class="text-red-700">{{ error }}</span>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ '/profiles/' ~ profile.id ~ '/edit' if profile else '/profiles' }}">
+        <div class="space-y-4">
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <input type="text" name="name" id="name" required
+                       value="{{ profile.name if profile else '' }}"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+            </div>
+
+            <div>
+                <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <input type="text" name="description" id="description"
+                       value="{{ profile.description or '' }}"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Prompt Mode *</label>
+                <div class="flex gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="prompt_mode" value="custom"
+                               {{ 'checked' if not profile or profile.prompt_mode == 'custom' }}
+                               onchange="toggleMode(this.value)"
+                               class="text-blue-600">
+                        <span class="text-sm">Custom Prompt</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="prompt_mode" value="template"
+                               {{ 'checked' if profile and profile.prompt_mode == 'template' }}
+                               onchange="toggleMode(this.value)"
+                               class="text-blue-600">
+                        <span class="text-sm">Template</span>
+                    </label>
+                </div>
+            </div>
+
+            <div id="custom-fields" class="{{ 'hidden' if profile and profile.prompt_mode == 'template' }}">
+                <label for="custom_prompt" class="block text-sm font-medium text-gray-700 mb-1">Custom Prompt</label>
+                <textarea name="custom_prompt" id="custom_prompt" rows="6"
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="Enter your analysis prompt...">{{ profile.custom_prompt or '' if profile else '' }}</textarea>
+            </div>
+
+            <div id="template-fields" class="{{ '' if profile and profile.prompt_mode == 'template' else 'hidden' }}">
+                <div class="space-y-3">
+                    <div>
+                        <label for="expert" class="block text-sm font-medium text-gray-700 mb-1">Expert Role *</label>
+                        <input type="text" name="expert" id="expert"
+                               value="{{ profile.expert or '' if profile else '' }}"
+                               placeholder="e.g. medical diagnostics"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="main_task" class="block text-sm font-medium text-gray-700 mb-1">Main Task *</label>
+                        <textarea name="main_task" id="main_task" rows="3"
+                                  placeholder="e.g. Analyze the audio and identify key symptoms mentioned"
+                                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500">{{ profile.main_task or '' if profile else '' }}</textarea>
+                    </div>
+                    <div>
+                        <label for="fields_for_json" class="block text-sm font-medium text-gray-700 mb-1">JSON Response Fields</label>
+                        <input type="text" name="fields_for_json" id="fields_for_json"
+                               value="{{ profile.fields_for_json or '' if profile else '' }}"
+                               placeholder="e.g. transcript, diagnosis, confidence"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label for="trigger_words" class="block text-sm font-medium text-gray-700 mb-1">Trigger Words</label>
+                <textarea name="trigger_words" id="trigger_words" rows="2"
+                          placeholder="Comma-separated: word1, word2, word3"
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500">{{ profile.trigger_words|join(', ') if profile and profile.trigger_words else '' }}</textarea>
+                <p class="text-xs text-gray-400 mt-1">Separate words with commas. Works with both custom and template modes.</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3 mt-6">
+            <button type="submit"
+                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm">
+                {{ 'Save Changes' if profile else 'Create Profile' }}
+            </button>
+            <a href="/profiles" class="text-gray-500 hover:text-gray-700 text-sm">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+function toggleMode(mode) {
+    const customFields = document.getElementById('custom-fields');
+    const templateFields = document.getElementById('template-fields');
+    if (mode === 'template') {
+        customFields.classList.add('hidden');
+        templateFields.classList.remove('hidden');
+    } else {
+        customFields.classList.remove('hidden');
+        templateFields.classList.add('hidden');
+    }
+}
+</script>
+{% endblock %}

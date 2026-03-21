@@ -16,6 +16,7 @@
             <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">File</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Profile</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fraud Score</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -26,6 +27,7 @@
             <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/calls/{{ call.id }}'">
                 <td class="px-6 py-4 text-sm text-gray-500">{{ call.created_at.strftime('%Y-%m-%d %H:%M') if call.created_at else '—' }}</td>
                 <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ call.filename }}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{ call.profile.name if call.profile else 'Default' }}</td>
                 <td class="px-6 py-4 text-sm text-gray-500">{{ call.source }}</td>
                 <td class="px-6 py-4 text-sm">
                     {% if call.analysis %}
@@ -49,7 +51,7 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">No calls yet</td></tr>
+            <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">No calls yet</td></tr>
             {% endfor %}
         </tbody>
     </table>

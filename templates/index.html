@@ -55,6 +55,17 @@
         </div>
     </div>
 
+    <!-- Profile select -->
+    <div class="mt-4">
+        <label for="profile-select" class="block text-sm font-medium text-gray-700 mb-1">Analysis Profile</label>
+        <select id="profile-select" class="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full max-w-xs">
+            <option value="">Default (Fraud Detection)</option>
+            {% for p in profiles %}
+            <option value="{{ p.id }}">{{ p.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
     <!-- Buttons -->
     <div class="flex items-center gap-3 mt-4">
         <button id="btn-analyze" onclick="startUpload()" disabled
@@ -101,6 +112,10 @@ function startUpload() {
 
     const formData = new FormData();
     formData.append('file', selectedFile);
+    const profileId = document.getElementById('profile-select').value;
+    if (profileId) {
+        formData.append('profile_id', profileId);
+    }
 
     const xhr = new XMLHttpRequest();
     const progressArea = document.getElementById('progress-area');
