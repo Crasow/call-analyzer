@@ -161,7 +161,9 @@ function startUpload() {
             // Success
             progressBar.className = 'h-2.5 rounded-full bg-green-500 transition-all duration-300';
             progressLabel.textContent = 'Done!';
-            document.getElementById('result').innerHTML = xhr.responseText;
+            const resultEl = document.getElementById('result');
+            resultEl.innerHTML = xhr.responseText;
+            htmx.process(resultEl);
         } else {
             progressBar.className = 'h-2.5 rounded-full bg-red-500 transition-all duration-300';
             progressLabel.textContent = 'Server error';
