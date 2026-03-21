@@ -110,7 +110,7 @@ async def analyze_call(call: Call, session: AsyncSession) -> AnalysisResult:
         fraud_score=parsed.get("fraud_score", 0.0),
         fraud_categories=parsed.get("fraud_categories", []),
         reasons=parsed.get("reasons", []),
-        raw_response=raw_response,
+        raw_response=parsed,
         analyzed_at=datetime.now(UTC).replace(tzinfo=None),
     )
     session.add(result)
@@ -157,7 +157,7 @@ async def analyze_file(
         fraud_score=parsed.get("fraud_score", 0.0),
         fraud_categories=parsed.get("fraud_categories", []),
         reasons=parsed.get("reasons", []),
-        raw_response=raw_response,
+        raw_response=parsed,
         analyzed_at=datetime.now(UTC).replace(tzinfo=None),
     )
     session.add(result)
@@ -216,7 +216,7 @@ async def analyze_bytes(
         fraud_score=parsed.get("fraud_score", 0.0),
         fraud_categories=parsed.get("fraud_categories", []),
         reasons=parsed.get("reasons", []),
-        raw_response=raw_response,
+        raw_response=parsed,
         analyzed_at=datetime.now(UTC).replace(tzinfo=None),
     )
     session.add(result)
