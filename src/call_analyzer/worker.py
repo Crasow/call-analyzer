@@ -9,6 +9,7 @@ from call_analyzer.config import settings
 from call_analyzer.database import async_session
 from call_analyzer.models import Call
 from call_analyzer.notifications import send_fraud_alert
+from call_analyzer.webhooks import send_webhook
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,11 @@ async def process_call(call_id, semaphore: asyncio.Semaphore) -> None:
                         await send_fraud_alert(call, result)
                     except Exception:
                         logger.exception("Failed to send fraud alert email for call %s", call_id)
+
+                try:
+                    await send_webhook(call, result)
+                except Exception:
+                    logger.exception("Failed to send webhook for call %s", call_id)
 
                 await session.execute(
                     update(Call).where(Call.id == call_id).values(status="done")

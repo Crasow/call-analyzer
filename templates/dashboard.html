@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Call Analyzer{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-sm text-gray-500">Total Calls</div>
+        <div class="text-3xl font-bold">{{ stats.total_calls }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-sm text-gray-500">Fraud Detected</div>
+        <div class="text-3xl font-bold text-red-600">{{ stats.fraud_calls }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-sm text-gray-500">Clean Calls</div>
+        <div class="text-3xl font-bold text-green-600">{{ stats.clean_calls }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-sm text-gray-500">Profile Analyses</div>
+        <div class="text-3xl font-bold text-blue-600">{{ stats.profile_calls }}</div>
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-lg font-semibold mb-4">Calls per Day (Last 30 Days)</h2>
+    <canvas id="dailyChart" height="100"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+    const dailyData = {{ daily_stats | tojson }};
+    const labels = dailyData.map(d => d.date);
+    const totals = dailyData.map(d => d.total);
+    const frauds = dailyData.map(d => d.fraud);
+
+    new Chart(document.getElementById('dailyChart'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Total',
+                    data: totals,
+                    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    borderWidth: 1,
+                },
+                {
+                    label: 'Fraud',
+                    data: frauds,
+                    backgroundColor: 'rgba(220, 38, 38, 0.5)',
+                    borderColor: 'rgb(220, 38, 38)',
+                    borderWidth: 1,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1 } },
+                x: { ticks: { maxRotation: 45 } },
+            },
+        },
+    });
+</script>
+{% endblock %}
