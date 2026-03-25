@@ -18,7 +18,13 @@ dependencies = [
     "watchdog>=6.0",
     "psycopg2-binary>=2.9",
     "aiosmtplib>=3.0",
+    "starlette-csrf>=3.0",
+    "slowapi>=0.1",
+    "rich>=13.0",
 ]
+
+[project.optional-dependencies]
+s3 = ["aioboto3>=13.0"]
 
 [project.scripts]
 ca = "call_analyzer.cli:app"

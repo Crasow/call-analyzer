@@ -46,6 +46,11 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       ALERT_EMAIL_TO: ${ALERT_EMAIL_TO}
       ROOT_PATH: ${ROOT_PATH:-}
+      API_KEY: ${API_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      CSRF_SECRET: ${CSRF_SECRET:-}
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
     volumes:
       - uploads:/app/uploads
       - watch:/app/watch
@@ -53,6 +58,17 @@ services:
       - ./templates:/app/templates
       - ./static:/app/static
       - ./alembic:/app/alembic
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/v1/stats')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
 volumes:
   pgdata:

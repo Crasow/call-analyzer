@@ -12,9 +12,14 @@ COPY alembic/ ./alembic/
 COPY src/ ./src/
 COPY templates/ ./templates/
 COPY static/ ./static/
-COPY tests/ ./tests/
 
-RUN uv sync --frozen
+RUN uv sync --frozen --no-dev
+
+RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser \
+    && mkdir -p /app/uploads /app/watch \
+    && chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8080
 
