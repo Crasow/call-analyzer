@@ -41,7 +41,7 @@
                 {% endif %}
             </div>
         </div>
-        <a href="/calls/{{ call.id }}" class="ml-auto text-blue-600 hover:underline text-sm whitespace-nowrap">View details &rarr;</a>
+        <a href="{{ base_path }}/calls/{{ call.id }}" class="ml-auto text-blue-600 hover:underline text-sm whitespace-nowrap">View details &rarr;</a>
     </div>
 
     {% if call.profile_result and result.data %}
@@ -78,7 +78,7 @@
 </div>
 {% elif call and call.status in ('pending', 'processing') %}
 <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-4"
-     hx-get="/calls/{{ call.id }}/status"
+     hx-get="{{ base_path }}/calls/{{ call.id }}/status"
      hx-trigger="every 3s"
      hx-swap="outerHTML">
     <div class="flex items-center gap-3">

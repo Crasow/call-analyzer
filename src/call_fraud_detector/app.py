@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    application = FastAPI(title="Call Fraud Detector", lifespan=lifespan)
+    application = FastAPI(title="Call Fraud Detector", lifespan=lifespan, root_path=settings.root_path)
 
     static_dir = Path(__file__).resolve().parents[2] / "static"
     application.mount("/static", StaticFiles(directory=str(static_dir)), name="static")

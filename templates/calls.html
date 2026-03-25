@@ -4,9 +4,9 @@
 <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold">Call History</h1>
     <div class="flex gap-2">
-        <a href="/calls" class="px-3 py-1 rounded {% if not is_fraud %}bg-blue-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">All</a>
-        <a href="/calls?is_fraud=true" class="px-3 py-1 rounded {% if is_fraud == 'true' %}bg-red-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">Fraud</a>
-        <a href="/calls?is_fraud=false" class="px-3 py-1 rounded {% if is_fraud == 'false' %}bg-green-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">Clean</a>
+        <a href="{{ base_path }}/calls" class="px-3 py-1 rounded {% if not is_fraud %}bg-blue-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">All</a>
+        <a href="{{ base_path }}/calls?is_fraud=true" class="px-3 py-1 rounded {% if is_fraud == 'true' %}bg-red-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">Fraud</a>
+        <a href="{{ base_path }}/calls?is_fraud=false" class="px-3 py-1 rounded {% if is_fraud == 'false' %}bg-green-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">Clean</a>
     </div>
 </div>
 
@@ -24,7 +24,7 @@
         </thead>
         <tbody class="divide-y divide-gray-200">
             {% for call in calls %}
-            <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/calls/{{ call.id }}'">
+            <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='{{ base_path }}/calls/{{ call.id }}'">
                 <td class="px-6 py-4 text-sm text-gray-500">{{ call.created_at.strftime('%Y-%m-%d %H:%M') if call.created_at else '—' }}</td>
                 <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ call.filename }}</td>
                 <td class="px-6 py-4 text-sm text-gray-500">{{ call.profile.name if call.profile else 'Default' }}</td>
@@ -62,11 +62,11 @@
 {% if total_pages > 1 %}
 <div class="flex justify-center gap-2 mt-6">
     {% if page > 1 %}
-    <a href="/calls?page={{ page - 1 }}{% if is_fraud %}&is_fraud={{ is_fraud }}{% endif %}" class="px-3 py-1 bg-gray-200 rounded">Prev</a>
+    <a href="{{ base_path }}/calls?page={{ page - 1 }}{% if is_fraud %}&is_fraud={{ is_fraud }}{% endif %}" class="px-3 py-1 bg-gray-200 rounded">Prev</a>
     {% endif %}
     <span class="px-3 py-1 text-gray-600">Page {{ page }} of {{ total_pages }}</span>
     {% if page < total_pages %}
-    <a href="/calls?page={{ page + 1 }}{% if is_fraud %}&is_fraud={{ is_fraud }}{% endif %}" class="px-3 py-1 bg-gray-200 rounded">Next</a>
+    <a href="{{ base_path }}/calls?page={{ page + 1 }}{% if is_fraud %}&is_fraud={{ is_fraud }}{% endif %}" class="px-3 py-1 bg-gray-200 rounded">Next</a>
     {% endif %}
 </div>
 {% endif %}

@@ -29,6 +29,7 @@ templates.env.tests["list_value"] = lambda v: isinstance(v, list)
 templates.env.tests["dict_value"] = lambda v: isinstance(v, dict)
 templates.env.tests["bool_value"] = lambda v: isinstance(v, bool)
 templates.env.tests["number_value"] = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)
+templates.env.globals["base_path"] = settings.root_path
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -230,7 +231,7 @@ async def profile_create(
     )
     session.add(profile)
     await session.commit()
-    return RedirectResponse(url="/profiles", status_code=303)
+    return RedirectResponse(url=f"{settings.root_path}/profiles", status_code=303)
 
 
 @router.get("/profiles/{profile_id}/edit", response_class=HTMLResponse)
@@ -285,7 +286,7 @@ async def profile_update(
     profile.trigger_words = [w.strip() for w in trigger_words.split(",") if w.strip()] if trigger_words.strip() else None
 
     await session.commit()
-    return RedirectResponse(url="/profiles", status_code=303)
+    return RedirectResponse(url=f"{settings.root_path}/profiles", status_code=303)
 
 
 @router.post("/profiles/{profile_id}/delete")
@@ -295,4 +296,4 @@ async def profile_delete(profile_id: uuid.UUID, session: AsyncSession = Depends(
         return HTMLResponse("Profile not found", status_code=404)
     await session.delete(profile)
     await session.commit()
-    return RedirectResponse(url="/profiles", status_code=303)
+    return RedirectResponse(url=f"{settings.root_path}/profiles", status_code=303)

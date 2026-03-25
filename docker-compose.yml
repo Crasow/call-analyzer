@@ -45,6 +45,7 @@ services:
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       ALERT_EMAIL_TO: ${ALERT_EMAIL_TO}
+      ROOT_PATH: ${ROOT_PATH:-}
     volumes:
       - uploads:/app/uploads
       - watch:/app/watch

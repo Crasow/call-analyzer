@@ -168,14 +168,14 @@ def stats():
 
 
 @app.command()
-def serve(host: str = "0.0.0.0", port: int = 8080):
+def serve(host: str = "0.0.0.0", port: int = 8080, root_path: str = ""):
     """Start the web server."""
     import uvicorn
 
     from call_fraud_detector.app import create_app
 
     application = create_app()
-    uvicorn.run(application, host=host, port=port)
+    uvicorn.run(application, host=host, port=port, root_path=root_path)
 
 
 # ── Profile subcommands ─────────────────────────────────────────────

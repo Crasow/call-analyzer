@@ -191,7 +191,7 @@ function startUpload() {
     });
 
     xhr.timeout = 600000; // 10 min
-    xhr.open('POST', '/upload');
+    xhr.open('POST', '{{ base_path }}/upload');
     xhr.send(formData);
 }
 

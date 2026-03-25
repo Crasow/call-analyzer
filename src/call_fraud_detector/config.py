@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     alert_email_to: str = ""
+    root_path: str = ""
 
 
 settings = Settings()
