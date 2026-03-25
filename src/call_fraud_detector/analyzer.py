@@ -21,7 +21,7 @@ from call_fraud_detector.models import AnalysisResult, Call, Profile, ProfileRes
 ANALYSIS_PROMPT = """\
 You are a phone call fraud detection expert. Analyze this audio recording and provide:
 
-1. A full transcript of the call
+1. A full transcript of the call (in the same language as spoken in the audio)
 2. Whether this call is fraudulent
 3. A fraud score from 0.0 (definitely legitimate) to 1.0 (definitely fraud)
 4. Categories of fraud detected (if any)
