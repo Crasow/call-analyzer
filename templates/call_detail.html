@@ -79,7 +79,7 @@
         <div class="bg-white rounded-lg shadow p-6">
             <h2 class="text-lg font-semibold mb-4">Results</h2>
             <div class="divide-y divide-gray-100">
-                {% for key, value in result.data.items() %}
+                {% for key, value in result.data.items() if key != 'transcript' %}
                 {{ render_field(key, value) }}
                 {% endfor %}
             </div>
